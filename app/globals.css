@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&display=swap');
+
+/* Global Body Design */
+body {
+  margin: 0;
+  padding: 0;
+  background: #1c1c1c; /* Up N Atom Schwarz */
+  color: white;
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+/* Entfernt Scroll-Jumping komplett */
+html {
+  overflow-y: scroll;
+}
+
+/* Globale Link-Styles */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Smooth Animation */
+* {
+  transition: 0.15s ease;
+}
