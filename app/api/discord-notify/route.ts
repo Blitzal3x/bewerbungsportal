@@ -13,12 +13,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const content =
-      `📥 Neue Bewerbung eingegangen!\n` +
-      `• Name: **${record?.name ?? "?"}**\n` +
-      `• Stelle: **${record?.stelle ?? "?"}**\n` +
-      `• Code: \`${record?.code ?? "?"}\`\n` +
-      `• Status: **${record?.status ?? "Offen"}**`;
+    const rolePing = "<@&1494390920022462536>";
+
+const content =
+  `${rolePing} 📥 Neue Bewerbung eingegangen!\n` +
+  `• Name: **${record?.name ?? "?"}**\n` +
+  `• Stelle: **${record?.stelle ?? "?"}**\n` +
+  `• Code: \`${record?.code ?? "?"}\`\n` +
+  `• Status: **${record?.status ?? "Offen"}**`;
 
     const res = await fetch(webhookUrl, {
       method: "POST",
