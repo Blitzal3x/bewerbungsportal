@@ -1,112 +1,82 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-const ROLE_ID = "1494390920022462536";
-
-function buildContent(record: any) {
-  const name = record?.name ?? "?";
-  const stelle = record?.stelle ?? "?";
-  const code = record?.code ?? "?";
-  const status = record?.status ?? "Offen";
-
-  // Ping nur bei "Offen" / neu
-  const ping = status === "Offen" ? `<@&${ROLE_ID}> ` : "";
-
-  return (
-    `${ping}📄 **Bewerbung**\n` +
-    `• Name: **${name}**\n` +
-    `• Stelle: **${stelle}**\n` +
-    `• Code: \`${code}\`\n` +
-    `• Status: **${status}**`
-  );
-}
-
-async function discordRequest(path: string, method: string, body?: any) {
-  const token = process.env.DISCORD_BOT_TOKEN;
-  if (!token) throw new Error("DISCORD_BOT_TOKEN missing");
-
-  const res = await fetch(`https://discord.com/api/v10${path}`, {
-    method,
-    headers: {
-      Authorization: `Bot ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const text = await res.text();
-  let json: any = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {}
-
-  if (!res.ok) {
-    throw new Error(`Discord API error ${res.status}: ${text}`);
-  }
-
-  return json;
-}
+const ROLE_ID = "1494390920022462536"; // deine Rolle
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    // Supabase Webhook Payload kann variieren:
+    // wir versuchen mehrere mögliche Felder
     const record = (body as any)?.record ?? (body as any)?.new ?? body;
+    const eventType =
+      (body as any)?.type ?? (body as any)?.eventType ?? (body as any)?.event ?? null;
 
-    const channelId = process.env.DISCORD_CHANNEL_ID;
-    if (!channelId) {
-      return NextResponse.json({ error: "DISCORD_CHANNEL_ID missing" }, { status: 500 });
+    const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+    if (!webhookUrl) {
+      return NextResponse.json({ error: "DISCORD_WEBHOOK_URL missing" }, { status: 500 });
     }
 
-    const applicationId = record?.id;
-    if (!applicationId) {
-      return NextResponse.json({ error: "Missing record.id from webhook payload" }, { status: 400 });
-    }
+    const name = record?.name ?? "?";
+    const stelle = record?.stelle ?? "?";
+    const code = record?.code ?? "?";
+    const status = record?.status ?? "Offen";
 
-    const content = buildContent(record);
+    // 1) Bei NEUER Bewerbung: Ping
+    // Wir erkennen INSERT entweder über eventType, oder falls nicht vorhanden: wenn status "Offen" + code existiert
+    const isInsert = String(eventType).toUpperCase() === "INSERT";
 
-    // Hole gespeicherte Discord-Message-ID (falls vorhanden)
-    const { data: existing, error: fetchErr } = await supabase
-      .from("applications")
-      .select("discord_message_id")
-      .eq("id", applicationId)
-      .single();
+    // 2) Bei UPDATE: nur posten, wenn Status "In Bearbeitung" ist (kein Ping)
+    const isUpdate = String(eventType).toUpperCase() === "UPDATE";
 
-    if (fetchErr) {
-      console.error(fetchErr);
-      return NextResponse.json({ error: "DB fetch failed" }, { status: 500 });
-    }
+    let content: string | null = null;
 
-    const messageId = existing?.discord_message_id;
-
-    if (!messageId) {
-      // 1) Erstmals posten
-      const msg = await discordRequest(`/channels/${channelId}/messages`, "POST", { content });
-
-      // 2) Message-ID speichern
-      const { error: updateErr } = await supabase
-        .from("applications")
-        .update({ discord_message_id: msg.id })
-        .eq("id", applicationId);
-
-      if (updateErr) {
-        console.error(updateErr);
-        // Nicht abbrechen – Nachricht wurde ja gepostet
+    if (isInsert) {
+      content =
+        `<@&${ROLE_ID}> 📥 **Neue Bewerbung eingegangen!**\n` +
+        `• Name: **${name}**\n` +
+        `• Stelle: **${stelle}**\n` +
+        `• Code: \`${code}\`\n` +
+        `• Status: **${status}**`;
+    } else if (isUpdate) {
+      // Nur wenn jetzt "In Bearbeitung"
+      if (status === "In Bearbeitung") {
+        content =
+          `🛠️ Bewerbung ist jetzt **In Bearbeitung**\n` +
+          `• Name: **${name}**\n` +
+          `• Stelle: **${stelle}**\n` +
+          `• Code: \`${code}\``;
+      } else {
+        // andere Updates ignorieren
+        return NextResponse.json({ ok: true, skipped: true });
       }
-
-      return NextResponse.json({ ok: true, posted: true, messageId: msg.id });
+    } else {
+      // Falls eventType nicht mitkommt, nichts kaputt machen:
+      // wir posten nur, wenn status "In Bearbeitung" ist (ohne Ping) oder wenn status "Offen" als "neu" erkannt wird.
+      if (status === "In Bearbeitung") {
+        content =
+          `🛠️ Bewerbung ist jetzt **In Bearbeitung**\n` +
+          `• Name: **${name}**\n` +
+          `• Stelle: **${stelle}**\n` +
+          `• Code: \`${code}\``;
+      } else {
+        return NextResponse.json({ ok: true, skipped: true });
+      }
     }
 
-    // Status-Update: Nachricht editieren
-    await discordRequest(`/channels/${channelId}/messages/${messageId}`, "PATCH", { content });
+    const res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
 
-    return NextResponse.json({ ok: true, edited: true, messageId });
-  } catch (e: any) {
-    console.error(e);
-    return NextResponse.json({ error: e?.message ?? "Server error" }, { status: 500 });
+    const text = await res.text();
+    if (!res.ok) {
+      return NextResponse.json({ error: "Discord webhook failed", details: text }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
 }
