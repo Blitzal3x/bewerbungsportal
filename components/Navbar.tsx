@@ -14,7 +14,7 @@ export default function Navbar() {
       {/* LINKS */}
       <div style={{ display: "flex", gap: "30px", alignItems: "center" }}>
         <span style={{ fontFamily: "Anton", fontSize: "30px" }}>
-          UP N ATOM
+          Hornys
         </span>
 
         <a href="/" style={linkStyle}>Home</a>
@@ -26,7 +26,7 @@ export default function Navbar() {
       {/* NOCH GRÖSSERES LOGO */}
       <img
         src="/atomlogo.png"
-        alt="Up n Atom Logo"
+        alt="Hornys Logo"
         style={{
           width: "140px",
           height: "auto",
