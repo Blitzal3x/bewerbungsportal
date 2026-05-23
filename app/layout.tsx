@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bewerbungsportal Up N Atom",
-  description: "UP N ATOM Fastfood Bewerbungsportal",
+  title: "Bewerbungsportal Hornys",
+  description: "Hortnys Fast food Bewerbungsportal",
 };
 
 export default function RootLayout({
