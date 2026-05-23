@@ -25,7 +25,7 @@ export default function HomePage() {
             marginBottom: "10px",
           }}
         >
-          UP N ATOM Bewerbungsportal
+          Hornys Bewerbungsportal
         </h1>
 
         <p
